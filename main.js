@@ -1,13 +1,15 @@
+/*global require,process,__dirname*/
 'use strict';
-const path = require('path');
+
 // const spawn = require('child_process').spawn;
 const electron = require('electron');
 // const pkgUp = require('pkg-up');
-const currentPath = require('current-path');
+// const currentPath = require('current-path');
 // const displayNotification = require('display-notification');
 // const getGulpTasks = require('get-gulp-tasks');
 // const _ = require('lodash');
-const fixPath = require('fix-path');
+const path = require('path');
+// const fixPath = require('fix-path');
 const { BrowserWindow } = electron;
 
 const app = electron.app;
@@ -26,60 +28,19 @@ if (process.platform === 'darwin') {
 }
 
 // fix the $PATH on macOS
-fixPath();
+// fixPath();
 
-
-function createProjectMenu() {
-  const menu = new Menu();
-
-  if (process.platform === 'darwin' || process.platform === 'win32') {
-    menu.append(new MenuItem({
-      label: 'Follow Finder',
-      type: 'checkbox',
-      checked: true
-    }));
-
-    menu.append(new MenuItem({type: 'separator'}));
-  }
-
-    new MenuItem({
-      label: "Open Project...",
-      click() {
-        dialog.showOpenDialog(
-          null,
-          {
-            title: "Pick a project",
-            properties: ["openDirectory"],
-            defaultPath: path.resolve("..")
-          },
-          dirs => {
-            if (!dirs) {
-              return;
-            }
-
-            setActiveProject(dirs[0]);
-            createTrayMenu();
-          }
-        );
-      }
-    });
-
-  menu.append(new MenuItem({type: 'separator'}));
-
-  new MenuItem({
-    label: "Clear",
-    click() {
-      createTrayMenu();
-    }
-  })
-
-  return menu;
-}
 
 function createTrayMenu() {
   const menu = new Menu();
 
   menu.append(new MenuItem({type: "separator"}));
+  menu.append(
+    new MenuItem({
+      label: "Open server log",
+      click: openLogWindow
+    })
+  );
   menu.append(
     new MenuItem({
       label: process.platform === "darwin" ? `Quit ${app.getName()}` : "Quit",
@@ -93,9 +54,9 @@ function createTrayMenu() {
 }
 
 function updateTray() {
-  currentPath().then(dir => {
-    setTimeout(updateTray, TRAY_UPDATE_INTERVAL);
-  });
+  // currentPath().then(dir => {
+  //   setTimeout(updateTray, TRAY_UPDATE_INTERVAL);
+  // });
 }
 
 app.on("ready", () => {
@@ -117,11 +78,12 @@ process.on('uncaughtException', console.error);
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 app.on("ready", () => {
-openLogWindow();
-var startServer = require("lively.server");
-startServer("localhost", 9012, "..");
-
-})
+  setTimeout(() => {
+    openLogWindow();
+    var startServer = require("lively.server");
+    startServer("localhost", 9012, path.resolve(path.join(__dirname, "..")));
+  }, 300);
+});
 
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -134,6 +96,8 @@ startServer("localhost", 9012, "..");
 var logWindow;
 var originalConsoleMethods = originalConsoleMethods || {};
 
+var fs = require("fs");
+let logStream = fs.createWriteStream(__dirname + '/log.txt');
 
 function openLogWindow() {
 
@@ -142,7 +106,8 @@ function openLogWindow() {
     return logWindow;
   }
 
-  logWindow = new BrowserWindow({width: 800, height: 600})
+  logWindow = new BrowserWindow({width: 800, height: 600});
+  logWindow.show();
   
   // let server = LivelyServer.servers.values().next().value
   // win.loadURL(`http://${server.hostname}:${server.port}/lively.app/logger.html`)
@@ -163,6 +128,7 @@ function openLogWindow() {
       originalConsoleMethods[selector] = console[selector];
     console[selector] = function(/*args*/) {
       let content = lively.lang.string.format(...arguments);
+      logStream.write(content + "\n");
       logWindow.webContents.send("message", {type: selector, content});
       return originalConsoleMethods[selector](...arguments);
     }
