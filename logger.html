@@ -3,6 +3,32 @@
   <head>
     <title>lively.next log</title>
     <style id="log-styling">
+      body {
+        margin: 5px;
+        font-family: sans-serif;
+        height: 100%;
+      }
+      h1 { font-size: 20pt; }
+      pre {  white-space: pre-wrap; margin: 0; }
+      .log-container {
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      ul {
+        margin: 0;
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        -webkit-margin-before: 0;
+        -webkit-margin-after: 0;
+        -webkit-padding-start: 0;
+      }
+      .log {}
+      .warn { color: "orange"; }
+      .error {  color: "red"; font-weight: "bold"; }
+      .stdout {}
+      .stderr {}
     </style>
     <script src='/lively.vm/dist/lively.vm_standalone.min.js'></script>
     <script src='/lively.2lively/dist/lively.2lively_client.js'></script>
@@ -19,52 +45,24 @@
         .catch(err => console.error("[l2l] failed:", err));
     </script>
     <script>
-    function addLog(msg) {
-      let log = document.querySelector("#log");
-      log.insertAdjacentHTML("beforeend", `<li class="${msg.type}">[${msg.type}] ${msg.content}</li>`)
-
-    }
-    require('electron').ipcRenderer.on('message', (event, msg) => {
-      if (msg.type && msg.content) addLog(msg);
-      else console.log("unknown msg", event, msg);
-    })
+      function addLogMessages(msgs) {
+        let log = document.querySelector("#log"),
+            items = msgs.map(msg => `<li class="${msg.type}">[${msg.type}] ${msg.content}</li>`);
+        log.insertAdjacentHTML("beforeend", items.join(""))
+        log.lastChild.scrollIntoViewIfNeeded();
+      }
+      let renderer = require('electron').ipcRenderer
+      renderer.on('log', (event, msg) => addLogMessages([msg]));
+      renderer.on('load-log', (event, msg) => addLogMessages(msg));
     </script>
-
-    
   </head>
 
-    <style>
-    body {
-      margin: 5px;
-      font-family: sans-serif;
-      height: 100%;
-    }
-    h1 { font-size: 20pt; }
-    pre {  margin: 0; }
-    .log-container {
-      height: 100%;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-    ul {
-      margin: 0;
-      list-style-type: none;
-      padding: 0;
-      margin: 0;
-      -webkit-margin-before: 0;
-      -webkit-margin-after: 0;
-      -webkit-padding-start: 0;
-    }
-    .log {}
-    .warn { color: "orange"; }
-    .error {  color: "red"; font-weight: "bold"; }
-    .stdout {}
-    .stderr {}
-    </style>
+  <body>
     <h1 class="title">lively.next server log</h1>
     <pre class="log-container">
       <ul id="log">
       </ul>
     </pre>
+  </body>
 
 </html>
