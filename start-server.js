@@ -2,47 +2,47 @@
 
 const path = require('path');
 const util = require('util');
-const { BrowserWindow, Menu, MenuItem, Tray, app } = require("electron");
-const fixPath = require('fix-path');
+const { BrowserWindow, Menu, MenuItem, Tray, app, shell } = require("electron");
+// const fixPath = require('fix-path');
 
 var tray,
     fs = require("fs"),
     logWindow,
     logStream = fs.createWriteStream(__dirname + '/log.txt'),
     recentLogMessages = [],
-    originalConsoleMethods = originalConsoleMethods || {};
+    originalConsoleMethods = originalConsoleMethods || {},
+    server;
 
 
 module.exports.start = start;
 
-async function start() {
+async function start(baseDir) {
   try {
     wrapConsole();
     prepareApp();
     app.on("ready", () => openLogWindow());
     await new Promise(resolve => setTimeout(resolve, 200))
-    return await startServer();
+    return await startServer(baseDir);
   } catch (err) {
     console.error(err);
     process.exit(1);
   }
 }
 
-function startServer() {
-  // require("systemjs");
-  // require("lively.modules");
-  // let rootDirectory = path.resolve(path.join(__dirname, ".."));
-  // var System = lively.modules.getSystem("lively", {
-  //   baseURL: `file://${rootDirectory}`
-  // });
-  // lively.modules.changeSystem(System, true);
-  // return lively.modules.registerPackage("lively.server");
-  return require("lively.server")("localhost", 9012, path.resolve(path.join(__dirname, "..")));
+async function startServer(baseDir) {
+  if (!baseDir) baseDir = path.resolve(path.join(__dirname, ".."));
+  server = await require("lively.server")("localhost", 9012, baseDir);
+  createTrayMenu();
+  return server;
 }
+
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// app / menu
 
 function prepareApp() {
   // fix the $PATH on macOS
-  fixPath();
+  // fixPath();
 
   if (process.platform === 'darwin') {
     app.dock.hide();
@@ -51,7 +51,6 @@ function prepareApp() {
   app.on("ready", () => {
     const name = "menubar/lively-icon";
     tray = new Tray(path.join(__dirname, `${name}.png`));
-    createTrayMenu();
   });
   
   app.on('window-all-closed', () => {
@@ -63,25 +62,36 @@ function prepareApp() {
 
 function createTrayMenu() {
   const menu = new Menu();
-
+  
+  server && menu.append(
+    new MenuItem({
+      label: "Open emtpy lively world",
+      click: () => shell.openExternal(`http://${server.hostname}${server.port ? `:${server.port}` : ""}/worlds/default`)
+    }));
+  server && menu.append(
+    new MenuItem({
+      label: "List lively worlds",
+      click: () => shell.openExternal(`http://${server.hostname}${server.port ? `:${server.port}` : ""}/worlds/`)
+    }));
   menu.append(
     new MenuItem({
       label: "Open server log",
       click: openLogWindow
-    })
-  );
+    }));
   menu.append(
     new MenuItem({
       label: process.platform === "darwin" ? `Quit ${app.getName()}` : "Quit",
       click: app.quit
-    })
-  );
+    }));
 
   tray.setContextMenu(menu);
 
   return menu;
 }
 
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// logging
 function recordLogMessage(type, logArgs) {
   let content = util.format(...logArgs),
       logMsg = {type, content};

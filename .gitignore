@@ -1,3 +1,5 @@
 node_modules
 .module_cache/
 log.txt
+build/
+lively.next.tar.gz

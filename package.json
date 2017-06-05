@@ -1,6 +1,6 @@
 {
   "name": "lively.app",
-  "version": "1.0.0",
+  "version": "1.2.0-rc1",
   "description": "lively.app runtime",
   "main": "main.js",
   "productName": "lively",
@@ -19,12 +19,6 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "~1.6.2",
-    "electron-rebuild": "^1.5.7"
-  },
-  "dependencies": {
-    "current-path": "^2.0.0",
-    "fix-path": "^2.1.0",
-    "lively.server": "^0.1.0",
-    "menubar": "^5.2.3"
+    "electron-packager": "^8.7.0"
   }
 }
