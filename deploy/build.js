@@ -19,6 +19,7 @@ let livelyDir = resolve(join(__dirname, "../../")),
     livelyAppDir = resolve(join(__dirname, "../")),
     packages = JSON.parse(fs.readFileSync(join(livelyDir, "lively.installer/packages-config.json"))),
     version = JSON.parse(fs.readFileSync(join(livelyDir, "lively.app/package.json"))).version,
+    electronVersion = JSON.parse(fs.readFileSync(join(livelyDir, "lively.app/node_modules/electron/package.json"))).version,
     preDir = join(livelyDir, "lively.app/build/pre"),
     archive = join(livelyDir, "lively.app/lively.next.tar.gz"),
     additionalFiles = [
@@ -35,13 +36,14 @@ let livelyDir = resolve(join(__dirname, "../../")),
       ...additionalFiles
     ],
     rsyncExcludes = [".module_cache"].map(ea => `--exclude ${ea}`).join(" "),
-    copyLivelyPackages = true,
-    copyDependencies = true,
-    buildDependencies = true,
-    copyHelpers = true,
-    createTarArchive = true,
-    createAppInfo = true,
-    runElectronPackager = true;
+    copyLivelyPackages = false,
+    copyDependencies = false,
+    buildDependencies = false,
+    copyHelpers = false,
+    createTarArchive = false,
+    createAppInfo = false,
+    runElectronPackager = false,
+    zipApp = true;
 
 async function build() {
 
@@ -127,7 +129,6 @@ async function build() {
     x("find . -name .module_cache -type d -print0 | xargs -0 rm -rf");
 
     // https://github.com/electron-userland/electron-packager
-    let electronVersion = JSON.parse(fs.readFileSync(join(livelyDir, "lively.app/node_modules/electron/package.json"))).version;
     let appPaths = await new Promise((resolve, reject) =>
       packager({
         dir: livelyAppDir,
@@ -148,9 +149,17 @@ async function build() {
     // "build": "npm run pack:osx && npm run pack:win32 && npm run pack:win64"
   }
 
+  if (zipApp) {
+    let zipDir = join(livelyAppDir, "build/lively-darwin-x64"),
+        zipFile = `lively.app.${version}.zip`
+    x(`if [[ -f ${zipFile} ]]; then rm ${zipFile}; fi`, {cwd: zipDir});
+    x(`zip -r ${zipFile} lively.app`, {cwd: zipDir, stdio: "inherit"});
+    console.log(`Zipping successful: ${join(zipDir, zipFile)}`);
+  }
 }
 
 
 module.exports = build;
 
-if (require.main && require.main.filename === __filename) build();
+if (require.main && require.main.filename === __filename)
+  build().catch(err => { console.error(err.stack); process.exit(1); });
