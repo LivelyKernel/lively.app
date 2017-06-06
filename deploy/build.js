@@ -36,14 +36,15 @@ let livelyDir = resolve(join(__dirname, "../../")),
       ...additionalFiles
     ],
     rsyncExcludes = [".module_cache"].map(ea => `--exclude ${ea}`).join(" "),
-    copyLivelyPackages = false,
-    copyDependencies = false,
-    buildDependencies = false,
-    copyHelpers = false,
-    createTarArchive = false,
-    createAppInfo = false,
-    runElectronPackager = false,
-    zipApp = true;
+    copyLivelyPackages = true,
+    copyDependencies = true,
+    buildDependencies = true,
+    copyHelpers = true,
+    createTarArchive = true,
+    createAppInfo = true,
+    runElectronPackager = true,
+    codeSign = true,
+    zipApp = false/*deprecated*/;
 
 async function build() {
 
@@ -67,6 +68,11 @@ async function build() {
       x(`rsync -az --delete ${rsyncExcludes} --delete-excluded ${from}/ ${to}/`);
     }
     x(`rm -rf ${join(preDir, "lively.app/build")}`);
+
+    // remove my custom worlds
+    x("find . -iname '*.json' -type f -not -name default.json -print0 | xargs -0 rm", {cwd: join(preDir, "lively.morphic/worlds")});
+
+    fs.writeFileSync(join(livelyDir, "lively.app/log.txt"), "");
   }
 
   if (copyDependencies) {
@@ -141,12 +147,22 @@ async function build() {
         out: join(livelyAppDir, "build"),
         overwrite: true,
         platform: "darwin", /*linux, win32, darwin, mas, all*/
+        appBundleId: "web.lively.app",
+        helperBundleId: "helper.web.lively.app",
+        appCategoryType: "public.app-category.developer-tools",
+        // osxSign: {identity: "Developer ID Application: Robert Krahn (BX6G5LDCXH)"},
       }, (err, appPaths) => err ? reject(err): resolve(appPaths)));
 
     // "pack:osx": "electron-packager . $npm_package_productName --out=dist/osx --platform=darwin --arch=x64 --icon=assets/build/osx/icon.icns && npm run codesign",
     // "pack:win32": "electron-packager . $npm_package_productName --out=dist/win --platform=win32 --arch=ia32",
     // "pack:win64": "electron-packager . $npm_package_productName --out=dist/win --platform=win32 --arch=x64 --version=0.36.2 app-version=1.0 --icon=assets/build/win/icon.ico",
     // "build": "npm run pack:osx && npm run pack:win32 && npm run pack:win64"
+  }
+
+  if (codeSign) {
+    console.log("Code signing mac app");
+    x(`mac/sign.sh "${version}"`, {cwd: livelyAppDir, stdio: "inherit"});
+    // spctl --assess --verbose lively.app
   }
 
   if (zipApp) {

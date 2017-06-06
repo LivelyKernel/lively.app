@@ -1,14 +1,14 @@
 /*global require,process,__dirname,module*/
 
-const path = require('path');
-const util = require('util');
-const { BrowserWindow, Menu, MenuItem, Tray, app, shell } = require("electron");
-// const fixPath = require('fix-path');
+const path = require('path'),
+      util = require('util'),
+      fs = require("fs"),
+      { BrowserWindow, Menu, MenuItem, Tray, app, shell } = require("electron"),
+      livelyDir = path.join(process.env.HOME, "./lively")
 
 var tray,
-    fs = require("fs"),
     logWindow,
-    logStream = fs.createWriteStream(__dirname + '/log.txt'),
+    logStream = fs.createWriteStream(path.join(livelyDir, 'lively.app.log')),
     recentLogMessages = [],
     originalConsoleMethods = originalConsoleMethods || {},
     server;
