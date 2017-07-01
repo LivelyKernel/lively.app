@@ -1,7 +1,7 @@
 /*global require, process*/
 'use strict';
 
-let { app, BrowserWindow } = require("electron"),
+let { app, shell, BrowserWindow } = require("electron"),
     { join: j, basename } = require("path"),
     fs = require("fs"),
     env = process.env,
@@ -9,30 +9,45 @@ let { app, BrowserWindow } = require("electron"),
     packageDepDir = j(livelyDir, "lively.next-node_modules"),
     flatnDir = j(livelyDir, "flatn"),
     flatnBin = j(flatnDir, "bin"),
-    flatnModuleResolver = j(flatnDir, "module-resolver.js");
+    flatnModuleResolver = j(flatnDir, "module-resolver.js"),
+    appPath;
 
-if (needsInitialize()) {
-  initialize().catch(err => {
-    console.error("Error starting lively.app:", err);
-    process.exist(1);
-  })
-} else {
-  startServer();
+main().catch(err => {
+  console.error("Error starting lively.app:", err);
+  process.exist(1);
+});
+
+async function main() {
+  await new Promise(resolve => app.on("ready", () => resolve()));
+  appPath = app.getAppPath();
+  return needsInitialize() ? initialize() : startServer();
 }
 
-
 function needsInitialize() {
-  return !fs.existsSync(livelyDir);
+  if (!fs.existsSync(livelyDir)) return true;
+
+  if (!fs.existsSync(j(livelyDir, "app-info.json"))) return true;
+
+  try {
+    var appInfo = JSON.parse(fs.readFileSync(j(livelyDir, "app-info.json"))),
+        semver = require(j(appPath, "./semver/semver.5.3.0.js")),
+        packageJson = JSON.parse(fs.readFileSync(j(appPath, "package.json")));
+    if (semver.lt(appInfo.version, packageJson.version, true))
+      return true;
+  } catch (err) {
+    console.error("error in needsInitialize:", err);
+    return true; 
+  }
+  return false;
 }
 
 async function initialize() {
 
-  await new Promise(resolve => app.on("ready", () => resolve()));
+  var logWindow = await openLogWindow();
 
-  var appPath = app.getAppPath(),
-      logWindow = await openLogWindow();
-
-  log(`${livelyDir} does not exist yet, initializing...`);
+  let removed = moveOldLivelyFolderToThrash();
+  if (removed) log(`Moving old ${livelyDir} to ${removed}, initializing new version...`);
+  else log(`${livelyDir} does not exist yet, initializing...`);
 
   try {
     let extract = require(j(appPath, "./deploy/extract.js"));
@@ -70,6 +85,58 @@ async function initialize() {
     logWindow.webContents.send("log", {type: "log", content});  
   }
 }
+
+
+function moveOldLivelyFolderToThrash() {
+  if (!fs.existsSync(livelyDir)) return null;
+  if (shell.moveItemToTrash(livelyDir)) return "Thrash";
+  let outOfMyWayDir = j(env.HOME, ".lively" + timestamp() + "/");
+  copyFolderRecursiveSync(livelyDir, outOfMyWayDir);
+  return outOfMyWayDir;
+}
+
+function copyFolderRecursiveSync(source, target) {
+  console.log(`Copying ${source} to ${target}`);
+
+  var files = [];
+
+  // check if folder needs to be created or integrated
+  var targetFolder = j(target, basename(source));
+  if (!fs.existsSync(targetFolder)) fs.mkdirSync(targetFolder);
+
+  // copy
+  if (fs.lstatSync(source).isDirectory()) {
+    files = fs.readdirSync(source);
+    files.forEach(function(file) {
+      var curSource = j(source, file);
+      if (fs.lstatSync(curSource).isDirectory())
+        copyFolderRecursiveSync(curSource, targetFolder);
+      else
+        copyFileSync(curSource, targetFolder);
+    });
+  }
+
+  function copyFileSync(source, target) {
+    var targetFile = target;
+    // if target is a directory a new file with the same name will be created
+    if (fs.existsSync(target)) {
+      if (fs.lstatSync(target).isDirectory()) {
+        targetFile = j(target, basename(source));
+      }
+    }
+    
+    fs.writeFileSync(targetFile, fs.readFileSync(source));
+  }
+}
+
+function timestamp() {
+  return new Date().toString()
+    .replace(/^[^\s]+\s/, "")
+    .replace(/\s[^\s]+\s[^\s]+$/, "")
+    .replace(/[\s:]/g, "-");
+}
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 function startServer() {
   let livelyPackages = fs.readdirSync(livelyDir)

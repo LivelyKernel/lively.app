@@ -4,7 +4,8 @@ const path = require('path'),
       util = require('util'),
       fs = require("fs"),
       { BrowserWindow, Menu, MenuItem, Tray, app, shell } = require("electron"),
-      livelyDir = path.join(process.env.HOME, "./lively")
+      livelyDir = path.join(process.env.HOME, "./lively"),
+      menuTrayIcon = "menubar/lively-icon";
 
 var tray,
     logWindow,
@@ -20,7 +21,8 @@ async function start(baseDir) {
   try {
     wrapConsole();
     prepareApp();
-    app.on("ready", () => openLogWindow());
+    if (app.isReady()) openLogWindow();
+    else app.on("ready", () => openLogWindow());
     await new Promise(resolve => setTimeout(resolve, 200))
     return await startServer(baseDir);
   } catch (err) {
@@ -44,19 +46,15 @@ function prepareApp() {
   // fix the $PATH on macOS
   // fixPath();
 
-  if (process.platform === 'darwin') {
-    app.dock.hide();
+  if (process.platform === 'darwin') app.dock.hide();
+
+  if (app.isReady()) {
+    tray = new Tray(path.join(__dirname, `${menuTrayIcon}.png`));
+  } else {
+    app.on("ready", () => tray = new Tray(path.join(__dirname, `${menuTrayIcon}.png`)));
   }
 
-  app.on("ready", () => {
-    const name = "menubar/lively-icon";
-    tray = new Tray(path.join(__dirname, `${name}.png`));
-  });
-  
-  app.on('window-all-closed', () => {
-    console.log("all windows closed");
-  });
-  
+  app.on('window-all-closed', () => console.log("all windows closed"));  
   process.on('uncaughtException', console.error);
 }
 

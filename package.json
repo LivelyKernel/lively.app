@@ -1,6 +1,6 @@
 {
   "name": "lively.app",
-  "version": "1.2.0-rc4",
+  "version": "1.2.0-rc5",
   "description": "lively.app runtime",
   "main": "main.js",
   "productName": "lively",
